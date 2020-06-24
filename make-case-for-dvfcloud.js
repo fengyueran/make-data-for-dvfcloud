@@ -1,5 +1,5 @@
 const axios = require("axios");
-const config = require("./config.json");
+const config = require("./login-config.json");
 
 const login = async () => {
   try {
