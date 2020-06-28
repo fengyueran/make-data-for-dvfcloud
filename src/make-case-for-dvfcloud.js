@@ -1,3 +1,4 @@
+/* eslint-disable camelcase */
 const path = require("path");
 const axios = require("axios");
 const { createDistDir, createDir } = require("./util");
@@ -35,19 +36,28 @@ const getCompletedCases = (cases) =>
 const downloadVaildFilesOfACase = async (caseName, downloadList) => {
   try {
     console.log(`start downloadVaildFilesOfACase ${caseName}...`);
-    const VALID_FILE_TYPES = ["MODEL_FFR", "REPORT_PDF"];
     const BUCKET = "curacloud-cases-beijing";
     const downloadTasks = [];
     const baseDir = path.join(__dirname, `../dist/${caseName}`);
     await createDir(baseDir);
-    downloadList.forEach(({ id, name, type, uploadBucket }) => {
-      const isValidFile =
-        VALID_FILE_TYPES.indexOf(type) >= 0 && uploadBucket === BUCKET;
+    downloadList.forEach(
+      ({ id, copy_of, name, type, uploadBucket, thumbnailUrl }) => {
+        const isValidFile =
+          (uploadBucket === BUCKET && name === "report.pdf") ||
+          name.includes("_aorta+both.ply");
 
-      if (isValidFile) {
-        downloadTasks.push(downloadFile(id, `${baseDir}/${name}`));
+        if (isValidFile) {
+          const fileId = copy_of || id;
+          downloadTasks.push(downloadFile(fileId, `${baseDir}/${name}`));
+        }
+        if (thumbnailUrl && type === "MODEL_FFR") {
+          const thumbnailId = thumbnailUrl.replace("/file/", "");
+          downloadTasks.push(
+            downloadFile(thumbnailId, `${baseDir}/thumbnail.jpeg`)
+          );
+        }
       }
-    });
+    );
     await Promise.all(downloadTasks);
   } catch (err) {
     throw err;
@@ -61,8 +71,10 @@ const downloadCasesFiles = async (cases) => {
       try {
         await downloadVaildFilesOfACase(name, downloadList);
         completedCount += 1;
-        const progress = ((completedCount * 100) / cases.length).toFixed(0);
-        console.log("download progress------:", `${progress}%`);
+        console.log(
+          "download progress------:",
+          `${completedCount}/${cases.length}`
+        );
       } catch (err) {
         throw err;
       }
@@ -95,9 +107,10 @@ const run = async () => {
     console.log("createDistDir success!");
 
     console.log("start downloadCasesFiles...");
-    // // await downloadCasesFiles([completedCases[1]]);
+    console.time("Download");
     await downloadCasesFiles(completedCases);
     console.log("downloadCasesFiles success!");
+    console.timeEnd("Download");
   } catch (err) {
     throw err;
   }
