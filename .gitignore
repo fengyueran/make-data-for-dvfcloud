@@ -1,3 +1,4 @@
 node_modules
+dist
 login-config.json
 oss-config.json
