@@ -1,5 +1,7 @@
 const fs = require("fs");
+const path = require("path");
 const rimraf = require("rimraf");
+const unzipper = require("unzipper");
 
 const rm = (filePath) =>
   new Promise((resolve, reject) => {
@@ -29,16 +31,27 @@ const createDir = (dir) =>
 
 const createDistDir = async () => {
   try {
-    const isDirExist = fs.existsSync("dist");
+    const dist = path.join(__dirname, "../dist");
+    const isDirExist = fs.existsSync(dist);
     if (isDirExist) {
-      await rm("dist");
+      await rm(dist);
     }
-    await createDir("dist");
+    await createDir(dist);
+    return dist;
+  } catch (err) {
+    throw err;
+  }
+};
+
+const unzip = async (origin, dist) => {
+  try {
+    fs.createReadStream(origin).pipe(unzipper.Extract({ path: dist }));
   } catch (err) {
     throw err;
   }
 };
 
 exports.rm = rm;
+exports.unzip = unzip;
 exports.createDir = createDir;
 exports.createDistDir = createDistDir;

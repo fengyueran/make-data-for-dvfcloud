@@ -6,6 +6,7 @@ const client = new OSS(config);
 const downloadFile = async (id, savePath) => {
   try {
     await client.get(id, savePath);
+    console.log(`downloadFile ${savePath} success`);
   } catch (err) {
     console.log("id", id);
     console.log("savePath", savePath);
@@ -14,8 +15,8 @@ const downloadFile = async (id, savePath) => {
   }
 };
 // downloadFile(
-//   "091a9765-12b6-49bb-93ce-b6ebdd2a8933",
-//   "/Users/xinghunm/xinghun/MyHouse/make-data-for-dvfcloud/dist/HT-19LHYJ/LG-194YJ7_aorta+both.ply.zip"
+//   "3880ae4e-8fdc-449a-8ee5-ad54fd181aac",
+//   "/Users/xinghunm/xinghun/MyHouse/make-data-for-dvfcloud/dist/HT-19H9CS/LG-194LCX_aorta+both.ply.zip"
 // );
 
 module.exports = downloadFile;
