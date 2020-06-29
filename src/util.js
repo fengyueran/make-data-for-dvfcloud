@@ -5,39 +5,28 @@ const unzipper = require("unzipper");
 
 const rm = (filePath) =>
   new Promise((resolve, reject) => {
-    rimraf(filePath, (err) => {
-      if (err) {
-        reject(err);
-      } else {
-        resolve();
-      }
-    });
-  });
-
-const createDir = (dir) =>
-  new Promise((resolve, reject) => {
-    try {
-      fs.mkdir(dir, (err) => {
+    if (fs.existsSync(filePath)) {
+      rimraf(filePath, (err) => {
         if (err) {
           reject(err);
         } else {
-          resolve(dir);
+          resolve();
         }
       });
-    } catch (err) {
-      reject(err);
+    } else {
+      resolve();
     }
   });
 
-const createDistDir = async () => {
+const createDir = async (dir, isDelete = true) => {
   try {
-    const dist = path.join(__dirname, "../dist");
-    const isDirExist = fs.existsSync(dist);
-    if (isDirExist) {
-      await rm(dist);
+    if (isDelete) {
+      const isDirExist = fs.existsSync(dir);
+      if (isDirExist) {
+        await rm(dir);
+      }
     }
-    await createDir(dist);
-    return dist;
+    fs.mkdirSync(dir, { recursive: true });
   } catch (err) {
     throw err;
   }
@@ -51,7 +40,18 @@ const unzip = async (origin, dist) => {
   }
 };
 
+const writeJson = (json, filePath) =>
+  new Promise((resolve, reject) => {
+    const jsonStr = JSON.stringify(json, null, 2);
+    fs.writeFile(filePath, jsonStr, "utf8", (err) => {
+      if (err) {
+        reject(err);
+      }
+      resolve();
+    });
+  });
+
 exports.rm = rm;
 exports.unzip = unzip;
 exports.createDir = createDir;
-exports.createDistDir = createDistDir;
+exports.writeJson = writeJson;
