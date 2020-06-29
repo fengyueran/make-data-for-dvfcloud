@@ -1,159 +1,160 @@
-/* eslint-disable camelcase */
+const fs = require("fs");
 const path = require("path");
-const axios = require("axios");
-const { createDistDir, createDir, unzip } = require("./util");
-const downloadFile = require("./download-file");
-const getZipFiles = require("./get-zip-files");
-const config = require("./config/login-config.json");
+const { rm, createDir, writeJson } = require("./util");
 
-const login = async () => {
+const TARGET_FILES = [
+  "_aorta+both.ply",
+  "_Left_cl_1Dmesh.vtp",
+  "_Right_cl_1Dmesh.vtp",
+  "report.pdf",
+  "thumbnail.jpeg",
+];
+
+const walk = (targetDir, option = { ignoreHiddenFile: true }) => {
+  const files = [];
+  const walkSync = (dir) => {
+    try {
+      const dirs = fs.readdirSync(dir);
+      for (let i = 0; i < dirs.length; i += 1) {
+        const fileName = dirs[i];
+        const filePath = path.join(dir, fileName);
+        const stat = fs.statSync(filePath);
+        const fileInfo = { name: fileName, filePath };
+        if (stat.isDirectory()) {
+          walkSync(filePath);
+        } else if (stat.isFile()) {
+          const isHiddenFile = fileName.startsWith(".");
+          if (isHiddenFile) {
+            if (!option.ignoreHiddenFile) {
+              files.push(fileInfo);
+            }
+          } else {
+            files.push(fileInfo);
+          }
+        }
+      }
+    } catch (e) {
+      throw e;
+    }
+  };
+  walkSync(targetDir);
+  return files;
+};
+
+const copy = (src, target) =>
+  new Promise((resolve, reject) => {
+    const fileStream = fs.createReadStream(src);
+    fileStream.on("end", resolve);
+    fileStream.on("error", reject);
+    fileStream.pipe(fs.createWriteStream(target));
+  });
+
+const readMeta = (file) => {
   try {
-    const { data } = await axios.post(
-      "https://api-data.curacloudplatform.com/user/authenticate",
-      config
-    );
-    return data.data.token;
+    const meta = JSON.parse(fs.readFileSync(file, "utf8"));
+    return meta;
+  } catch (e) {
+    throw e;
+  }
+};
+
+const createResultFile = async (caseDir, metaFile, files) => {
+  try {
+    const resultInfo = { files, meta: {} };
+    if (metaFile) {
+      const meta = await readMeta(metaFile);
+      if (meta) {
+        resultInfo.meta = meta;
+      }
+    }
+    const resultFile = `${caseDir}/__KEYAYUN_OPS_RESULT__.json`;
+    await writeJson(resultInfo, resultFile);
+    return resultInfo;
   } catch (err) {
     throw err;
   }
 };
 
-const getCaselist = async (token) => {
-  try {
-    const { data } = await axios.get(
-      `https://api-data.curacloudplatform.com/case/list?limit=999999&offset=0&orderkey=updatedAt&token=${token}&version=0.2.0`
-    );
-    const { caseList } = data.data;
-    console.log("Case count", data.data.caseList.length);
-    return caseList;
-  } catch (err) {
-    throw err;
-  }
-};
+const checkFile = (resultInfo) => {
+  const lossFiles = [];
+  const { files } = resultInfo;
 
-const getCompletedCases = (cases) =>
-  cases.filter(({ dvStatus }) => dvStatus === "PROCESS_SUCCESS");
-
-const sortByUpdatedAt = (file1, file2) => file2.updatedAt - file1.updatedAt;
-
-const getVaildFileGroup = (downloadList) => {
-  const reports = [];
-  const models = [];
-  downloadList.forEach((info) => {
-    const { name } = info;
-    if (name === "report.pdf") {
-      reports.push(info);
-    } else if (name.includes("_aorta+both")) {
-      models.push(info);
+  TARGET_FILES.forEach((fileName) => {
+    const found = files.find((name) => name.endsWith(fileName));
+    if (!found) {
+      lossFiles.push(fileName);
     }
   });
-  return { reports, models };
-};
-
-const getThumbnail = (latestModel) => {
-  const { thumbnailUrl } = latestModel;
-  const thumbnailId = thumbnailUrl.replace("/file/", "");
-  const thumbnail = { id: thumbnailId, name: "thumbnail.jpeg" };
-  return thumbnail;
-};
-
-const getLatestFiles = (fileGroup) => {
-  const { reports, models } = fileGroup;
-  reports.sort(sortByUpdatedAt);
-  models.sort(sortByUpdatedAt);
-  const latestReport = reports[0];
-  const latestModel = models[0];
-  const thumbnail = getThumbnail(latestModel);
-  return [latestReport, latestModel, thumbnail];
-};
-
-const downloadVaildFilesOfACase = async (caseName, baseDir, downloadList) => {
-  try {
-    console.log(`start downloadVaildFilesOfACase ${caseName}...`);
-
-    const downloadTasks = [];
-    const fileGroup = getVaildFileGroup(downloadList);
-    const latestFiles = getLatestFiles(fileGroup);
-
-    latestFiles.forEach(({ id, copy_of, name }) => {
-      const fileId = copy_of || id;
-      downloadTasks.push(downloadFile(fileId, `${baseDir}/${name}`));
-    });
-
-    await Promise.all(downloadTasks);
-  } catch (err) {
-    throw err;
+  let result;
+  if (lossFiles.length > 0) {
+    result = { lossFiles, code: 404 };
+  } else {
+    result = { code: 200 };
   }
+  return result;
 };
 
-const downloadCasesFiles = async (cases) => {
+const constructFiles = async (caseDirName, targeDir, files) => {
   try {
-    let completedCount = 0;
-    const downloadACaseFiles = async (name, downloadList) => {
-      try {
-        const baseDir = path.join(__dirname, `../dist/${name}`);
-        await createDir(baseDir);
-        await downloadVaildFilesOfACase(name, baseDir, downloadList);
-        completedCount += 1;
-        console.log(
-          "download progress------:",
-          `${completedCount}/${cases.length}`
-        );
-      } catch (err) {
-        throw err;
+    const caseDir = `${targeDir}/${caseDirName}`;
+    await createDir(caseDir);
+    const copyTasks = [];
+    let metaFile;
+    for (let i = 0; i < files.length; i += 1) {
+      const { name, filePath } = files[i];
+      const found = TARGET_FILES.find((keyword) => name.endsWith(keyword));
+      if (name.endsWith("meta.json")) {
+        metaFile = filePath;
       }
-    };
-    for (let i = 0; i < cases.length; i += 1) {
-      const { downloadList, name } = cases[i];
-      // eslint-disable-next-line
-      await downloadACaseFiles(name, downloadList);
+      if (found) {
+        copyTasks.push(copy(filePath, `${caseDir}/${name}`).then(() => name));
+      }
     }
+    const res = await Promise.all(copyTasks);
+    const resultInfo = await createResultFile(caseDir, metaFile, res);
+
+    const result = checkFile(resultInfo);
+    return { caseName: caseDirName, ...result };
   } catch (err) {
     throw err;
   }
 };
 
-const unZipDirs = (dirsInfo) => {
-  try {
-    for (let i = 0; i < dirsInfo.length; i += 1) {
-      const { dir, filePath } = dirsInfo[i];
-      unzip(filePath, dir);
+const printFormatResult = (res) => {
+  res.forEach(({ caseName, code, lossFiles }) => {
+    if (code === 200) {
+      console.log(`Case ${caseName} is conversion success`);
+    } else {
+      console.log(`Case ${caseName} is missing files: ${lossFiles}`);
     }
-  } catch (err) {
-    throw err;
-  }
+  });
 };
 
-const run = async () => {
+const formatCases = async (sourceDir) => {
   try {
-    console.log("start login...");
-    const token = await login();
-    console.log("login success!");
+    const targetDir = path.join(sourceDir, "../results");
+    await rm(targetDir);
+    await createDir(targetDir);
 
-    console.log("start getCaselist...");
-    const caselist = await getCaselist(token);
-    console.log("getCaselist success", caselist.length);
-
-    const completedCases = getCompletedCases(caselist);
-    console.log("completedCases count", completedCases.length);
-
-    console.log("start createDistDir...");
-    const dist = await createDistDir();
-    console.log("createDistDir success!");
-
-    console.log("start downloadCasesFiles...");
-    console.time("Download");
-    await downloadCasesFiles(completedCases);
-    // const dist = path.join(__dirname, "../dist");
-    // const zipFiles = await getZipFiles(dist);
-    // await unZipDirs(zipFiles);
-    console.log(
-      "**********************Congratulations, downloadCasesFiles success!!!**********************"
-    );
-    console.timeEnd("Download");
-  } catch (err) {
-    throw err;
+    const dirs = fs.readdirSync(sourceDir);
+    const constructTasks = [];
+    for (let i = 0; i < dirs.length; i += 1) {
+      const caseDirName = dirs[i];
+      const casePath = path.join(sourceDir, caseDirName);
+      const stat = fs.statSync(casePath);
+      if (stat.isDirectory()) {
+        const files = walk(casePath);
+        constructTasks.push(constructFiles(caseDirName, targetDir, files));
+      }
+    }
+    const res = await Promise.all(constructTasks);
+    printFormatResult(res);
+  } catch (e) {
+    console.error(e);
   }
 };
 
-run();
+formatCases(
+  "/Users/xinghunm/xinghun/MyHouse/make-data-for-dvfcloud/dist/qlyy/data"
+);
+module.exports = formatCases;
