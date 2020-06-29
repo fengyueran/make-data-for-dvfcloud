@@ -2,6 +2,10 @@
   "name": "my-app",
   "version": "0.1.0",
   "private": true,
+  "scripts": {
+    "download": "node src/run-download-flow.js",
+    "format": "node src/run-make-case-flow.js"
+  },
   "devDependencies": {
     "@xinghunm/eslint-config": "^0.0.5",
     "babel-cli": "^6.26.0",

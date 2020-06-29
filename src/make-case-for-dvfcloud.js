@@ -154,7 +154,4 @@ const formatCases = async (sourceDir) => {
   }
 };
 
-formatCases(
-  "/Users/xinghunm/xinghun/MyHouse/make-data-for-dvfcloud/dist/qlyy/data"
-);
 module.exports = formatCases;

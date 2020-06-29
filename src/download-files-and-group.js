@@ -1,8 +1,7 @@
 /* eslint-disable camelcase, no-await-in-loop */
-const fs = require("fs");
 const path = require("path");
 const axios = require("axios");
-const { createDir, writeJson, rm } = require("./util");
+const { createDir, writeJson, unzip } = require("./util");
 const getZipFiles = require("./get-zip-files");
 const downloadFile = require("./download-file");
 
@@ -162,7 +161,7 @@ const unZipDirs = async (dirsInfo) => {
   }
 };
 
-const downloadFilesOfHostiptal = async () => {
+const downloadFilesAndGroup = async () => {
   try {
     console.time("Download");
     console.log("start login...");
@@ -197,5 +196,5 @@ const downloadFilesOfHostiptal = async () => {
     throw err;
   }
 };
-downloadFilesOfHostiptal();
-module.exports = downloadFilesOfHostiptal;
+
+module.exports = downloadFilesAndGroup;
