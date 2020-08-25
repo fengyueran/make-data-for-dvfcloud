@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const { rm, createDir, writeJson } = require("./util");
+const updateMetaConfig = require("./config/update-meta-config.json");
 
 const TARGET_FILES = [
   "_aorta+both.ply",
@@ -67,6 +68,7 @@ const createResultFile = async (caseDir, metaFile, files) => {
         resultInfo.meta = meta;
       }
     }
+    resultInfo.meta = { ...resultInfo.meta, ...updateMetaConfig };
     const resultFile = `${caseDir}/__KEYAYUN_OPS_RESULT__.json`;
     await writeJson(resultInfo, resultFile);
     return resultInfo;
