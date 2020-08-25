@@ -90,17 +90,19 @@ const downloadVaildFilesOfACase = async (caseName, baseDir, downloadList) => {
 const createMetaFile = (caseInfo, baseDir, downloadList) => {
   try {
     const { meta } = downloadList.find(({ type }) => type === "DICOM");
-    const { name, age, patientId, gender } = caseInfo;
+    const { name, age, patientId, gender, hospital } = caseInfo;
     const [{ studies }] = JSON.parse(meta);
 
     const metaInfo = {
-      caseId: name,
-      instanceId: config.instanceId,
-      StudyInstanceUID: studies[0].studyInstanceUID,
-      PatientAge: age,
-      StudyDate: studies[0].studyDate,
-      PatientID: patientId,
-      PatientSex: gender,
+      caseID: name,
+      instanceID: config.instanceID,
+      hospitalKey: config.hospitalKey,
+      institutionName: hospital,
+      studyInstanceUID: studies[0].studyInstanceUID,
+      patientAge: age,
+      studyDate: studies[0].studyDate,
+      patientID: patientId,
+      patientSex: gender,
     };
     const metaFilePath = `${baseDir}/meta.json`;
     writeJson(metaInfo, metaFilePath);
